@@ -17,7 +17,9 @@
       "Bash(git status:*)",
       "Bash(git log:*)",
       "Bash(git diff:*)",
-      "Bash(git tag:*)"
+      "Bash(git tag:*)",
+      "Bash(jira issue list:*)",
+      "Bash(jira issue view:*)"
     ]
   },
   "hooks": {
