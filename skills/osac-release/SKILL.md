@@ -74,8 +74,9 @@ Every step must have a header and use the icon vocabulary below.
   📦 osac-operator                   → /path/to/osac-operator
   📦 osac-aap                        → /path/to/osac-aap
   📦 bare-metal-fulfillment-operator → /path/to/bare-metal-fulfillment-operator
+  📦 osac-ui                         → /path/to/osac-ui
   📦 osac-installer                  → /path/to/osac-installer
-  ✅ All 5 repos discovered. No uncommitted changes.
+  ✅ All 6 repos discovered. No uncommitted changes.
 
 **Example -- if repos need cloning:**
 
@@ -84,8 +85,9 @@ Every step must have a header and use the icon vocabulary below.
   📦 Cloning osac-operator...
   📦 Cloning osac-aap...
   📦 Cloning bare-metal-fulfillment-operator...
+  📦 Cloning osac-ui...
   📦 Cloning osac-installer...
-  ✅ All 5 repos cloned and upstream remotes configured.
+  ✅ All 6 repos cloned and upstream remotes configured.
 
 **Example -- how Step 1 should look:**
 
@@ -96,6 +98,7 @@ Every step must have a header and use the icon vocabulary below.
   🏷️  osac-operator                   → v0.0.2  (git tag)
   🏷️  osac-aap                        → v0.0.4  (git tag)
   🔍 bare-metal-fulfillment-operator → (none)  (no git tags, checking OCI...)
+  🏷️  osac-ui                         → v0.0.1  (git tag)
   🔍 osac (umbrella)                 → v0.0.2  (OCI fallback)
 
 **Example -- how Step 5 should look:**
@@ -107,7 +110,8 @@ Every step must have a header and use the icon vocabulary below.
   🏷️  osac-operator                   → v0.0.3  pushed
   🏷️  osac-aap                        → v0.0.5  pushed
   🏷️  bare-metal-fulfillment-operator → v0.0.1  pushed
-  ✅ All 4 component tags pushed.
+  🏷️  osac-ui                         → v0.0.2  pushed
+  ✅ All 5 component tags pushed.
 
 **Example -- how Step 6 should look:**
 
@@ -117,6 +121,7 @@ Every step must have a header and use the icon vocabulary below.
   🔄 osac-operator                   → ✅ completed
   🔄 osac-aap                        → ⏳ in_progress (45s)
   🔄 bare-metal-fulfillment-operator → ⏳ queued
+  🔄 osac-ui                         → ⏳ queued
 
 **Example -- how Step 10 should look:**
 
@@ -164,9 +169,10 @@ Every step must have a header and use the icon vocabulary below.
               📦 osac-operator
               📦 osac-aap
               📦 bare-metal-fulfillment-operator
+              📦 osac-ui
               📦 osac-installer
    Run:     [silent bash clone loop]
-   Output:  ✅ All 5 repos cloned and upstream remotes configured.
+   Output:  ✅ All 6 repos cloned and upstream remotes configured.
    ```
 
    NOT: run clone first, then print 📦 lines after (that is duplicate/late).
@@ -202,6 +208,7 @@ publish time.
 | osac-operator | osac-project/osac-operator | `osac-operator` + `osac-operator-crds` | `v0.0.X` |
 | osac-aap | osac-project/osac-aap | `osac-aap` | `v0.0.X` |
 | bare-metal-fulfillment-operator | osac-project/bare-metal-fulfillment-operator | `bare-metal-fulfillment-operator` + `bare-metal-fulfillment-operator-crds` | `v0.0.X` |
+| osac-ui | osac-project/osac-ui | `osac-ui` | `v0.0.X` |
 | osac (umbrella) | osac-project/osac-installer | `osac` | `v0.0.X` or workflow_dispatch |
 
 All charts are published to `oci://ghcr.io/osac-project/charts`.
@@ -217,6 +224,7 @@ Repos are discovered dynamically using the `bootstrap.sh` sibling layout:
   osac-operator/
   osac-aap/
   bare-metal-fulfillment-operator/
+  osac-ui/
   osac-installer/
 ```
 
@@ -253,6 +261,7 @@ components with all selected by default:
 - [ ] osac-operator
 - [ ] bare-metal-fulfillment-operator
 - [ ] osac-aap
+- [ ] osac-ui (UI web console)
 - [ ] osac (umbrella)
 
 If `--only` or `--skip` flags were parsed from the user's message, pre-filter
@@ -402,6 +411,7 @@ Chart names to check per component (use the first one found):
 - osac-operator: `osac-operator`
 - osac-aap: `osac-aap`
 - bare-metal-fulfillment-operator: `bare-metal-fulfillment-operator`
+- osac-ui: `osac-ui`
 - osac (umbrella): `osac`
 
 If an OCI version is found but no git tag exists, use the OCI version as the
@@ -432,6 +442,8 @@ Print the computed versions using a box-drawing ASCII table:
 ├─────────────────────────────────┼─────────────────┼─────────────┼─────────┤
 │ bare-metal-fulfillment-operator │ (none)          │ unpublished │ v0.0.1  │
 ├─────────────────────────────────┼─────────────────┼─────────────┼─────────┤
+│ osac-ui                         │ (none)          │ unpublished │ v0.0.1  │
+├─────────────────────────────────┼─────────────────┼─────────────┼─────────┤
 │ osac (umbrella)                 │ v0.0.2          │ OCI         │ v0.0.3  │
 └─────────────────────────────────┴─────────────────┴─────────────┴─────────┘
 ```
@@ -460,7 +472,7 @@ Component selection now happens in Step 0.6 before tag fetching.
 ## Step 5: Tag and Push Components
 
 For each selected component (fulfillment-service, osac-operator, osac-aap,
-bare-metal-fulfillment-operator):
+bare-metal-fulfillment-operator, osac-ui):
 
 1. Check if tag already exists: `git ls-remote upstream --tags v<VERSION>`
 2. If tag exists on the same commit as `upstream/main`, skip tagging (already
@@ -511,6 +523,7 @@ workflows, then monitor each component:
    │ osac-operator                   │ publish-charts │ in_progress │
    │ osac-aap                        │ publish-charts │ polling...  │
    │ bare-metal-fulfillment-operator │ publish-charts │ polling...  │
+   │ osac-ui                         │ publish-charts │ polling...  │
    └─────────────────────────────────┴────────────────┴─────────────┘
    ```
 
@@ -535,6 +548,7 @@ Charts to verify per component:
 - osac-operator: `osac-operator` AND `osac-operator-crds` (both must exist)
 - osac-aap: `osac-aap`
 - bare-metal-fulfillment-operator: `bare-metal-fulfillment-operator` AND `bare-metal-fulfillment-operator-crds` (both must exist)
+- osac-ui: `osac-ui`
 
 If a chart is not found, wait 60 seconds and retry (up to 2 retries). For
 osac-operator and bare-metal-fulfillment-operator: verify both charts exist. The
@@ -556,7 +570,8 @@ gh workflow run publish-charts.yaml \
   -f service_version=<SERVICE_VERSION> \
   -f aap_version=<AAP_VERSION> \
   -f bmf_crds_version=<BMF_VERSION> \
-  -f bmf_version=<BMF_VERSION>
+  -f bmf_version=<BMF_VERSION> \
+  -f ui_version=<UI_VERSION>
 ```
 
 The umbrella version is determined from osac-installer's latest tag + patch
@@ -617,6 +632,7 @@ Release Complete! (Reason: <release reason from Step 0.5>)
 │ osac-aap                               │ 0.0.5   │ oci://ghcr.io/osac-project/charts/osac-aap                         │
 │ bare-metal-fulfillment-operator        │ 0.0.2   │ oci://ghcr.io/osac-project/charts/bare-metal-fulfillment-operator  │
 │ bare-metal-fulfillment-operator-crds   │ 0.0.2   │ oci://ghcr.io/osac-project/charts/bare-metal-fulfillment-operator… │
+│ osac-ui                                │ 0.0.1   │ oci://ghcr.io/osac-project/charts/osac-ui                           │
 │ osac (umbrella)                        │ 0.0.3   │ oci://ghcr.io/osac-project/charts/osac                             │
 └────────────────────────────────────────┴─────────┴──────────────────────────────────────────────────────────────────────┘
 
@@ -650,6 +666,7 @@ chart uses for them.
   success.
 - bare-metal-fulfillment-operator also publishes TWO charts (operator +
   operator-crds) from a single tag push. Same verification pattern.
+- osac-ui publishes ONE chart (`osac-ui`) from a single tag push.
 - Always tag `upstream/main` to ensure the latest merged code is tagged.
 - The umbrella chart uses `workflow_dispatch` (not tag push) to allow explicit
   version control over component dependencies.
