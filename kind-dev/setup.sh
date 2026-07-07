@@ -649,14 +649,13 @@ install_fake_crds() {
     return 0
   fi
 
-  log "Installing fake CRDs (HyperShift, OVN-K)..."
+  log "Installing fake CRDs (HyperShift, KubeVirt, OVN-K)..."
   for f in "${fakes_dir}"/*.yaml; do
     local base
     base=$(basename "$f")
     [[ "$base" == "kustomization.yaml" ]] && continue
-    # Skip CRDs managed by other installers
-    [[ "$base" == *"osac.openshift.io"* ]] && continue  # umbrella chart
-    [[ "$base" == *"kubevirt.io"* ]] && continue         # KubeVirt operator
+    # Skip CRDs managed by the umbrella chart
+    [[ "$base" == *"osac.openshift.io"* ]] && continue
     kubectl apply -f "$f" 2>/dev/null || true
   done
   log "Fake CRDs installed"
@@ -689,6 +688,50 @@ deploy_osac() {
   log "OSAC deployed via umbrella chart"
 }
 
+# ── OSAC UI ───────────────────────────────────────────────────────────────────
+
+deploy_osac_ui() {
+  log "Deploying OSAC UI..."
+  kubectl apply -f "${SCRIPT_DIR}/osac-ui-manifests.yaml"
+  kubectl apply -f "${SCRIPT_DIR}/httproute-ui.yaml"
+  kubectl -n "${OSAC_NAMESPACE}" rollout status deployment osac-ui --timeout=120s
+  log "OSAC UI deployed — http://ui.${OSAC_NAMESPACE}.localhost:8080"
+}
+
+register_hub() {
+  log "Registering kind cluster as hub..."
+
+  local hub_token
+  hub_token=$(kubectl -n "${OSAC_NAMESPACE}" create token admin --duration=87600h)
+
+  kubectl create clusterrolebinding fulfillment-controller-admin \
+    --clusterrole=cluster-admin \
+    --serviceaccount="${OSAC_NAMESPACE}:admin" \
+    --dry-run=client -o yaml | kubectl apply -f -
+
+  local ca_data
+  ca_data=$(kubectl config view --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
+
+  local kubeconfig
+  kubeconfig=$(printf '{
+    "apiVersion": "v1",
+    "kind": "Config",
+    "clusters": [{"name": "kind", "cluster": {"server": "https://kubernetes.default.svc.cluster.local:443", "certificate-authority-data": "%s"}}],
+    "users": [{"name": "admin", "user": {"token": "%s"}}],
+    "contexts": [{"name": "kind", "context": {"cluster": "kind", "user": "admin", "namespace": "%s"}}],
+    "current-context": "kind"
+  }' "${ca_data}" "${hub_token}" "${OSAC_NAMESPACE}" | base64 -w0)
+
+  local admin_token
+  admin_token=$(kubectl -n "${OSAC_NAMESPACE}" create token admin)
+
+  grpcurl -insecure -H "Authorization: Bearer ${admin_token}" \
+    -d "{\"object\":{\"metadata\":{\"name\":\"kind-dev\"},\"spec\":{\"kubeconfig\":\"${kubeconfig}\",\"namespace\":\"${OSAC_NAMESPACE}\"}}}" \
+    internal-api."${OSAC_NAMESPACE}".localhost:8443 osac.private.v1.Hubs/Create >/dev/null 2>&1
+
+  log "Hub registered — networking resources will now reconcile to CRs"
+}
+
 # ── KubeVirt ───────────────────────────────────────────────────────────────────
 
 install_multus() {
@@ -707,6 +750,10 @@ install_multus() {
 
 install_kubevirt() {
   log "Installing KubeVirt..."
+
+  # Remove fake KubeVirt CRDs — they conflict with the real operator
+  log "Removing fake KubeVirt CRDs..."
+  kubectl delete crd virtualmachines.kubevirt.io virtualmachineinstances.kubevirt.io 2>/dev/null || true
 
   local version
   version=$(curl -s https://storage.googleapis.com/kubevirt-prow/release/kubevirt/kubevirt/stable.txt)
@@ -731,6 +778,13 @@ install_cdi() {
   kubectl apply -f "https://github.com/kubevirt/containerized-data-importer/releases/download/${version}/cdi-operator.yaml" 2>&1 | tail -3
   kubectl apply -f "https://github.com/kubevirt/containerized-data-importer/releases/download/${version}/cdi-cr.yaml"
   kubectl wait --for=condition=available --timeout=120s -n cdi deployments -l cdi.kubevirt.io
+
+  # Disable HonorWaitForFirstConsumer — local-path-provisioner deadlocks with
+  # WaitForFirstConsumer when CDI tries to import a disk image (no consumer pod
+  # exists yet to trigger provisioning). Removing the feature gate lets CDI
+  # create an importer pod immediately, which triggers the provisioner.
+  kubectl patch cdi cdi --type=json \
+    -p '[{"op":"replace","path":"/spec/config/featureGates","value":["WebhookPvcRendering"]}]'
 
   log "CDI installed"
 }
@@ -823,13 +877,23 @@ configure_awx() {
   done
   log "AWX project synced: ${status}"
 
-  # Create job templates
-  local templates=(
+  # Create compute instance job templates (real playbooks + pod network override for kind)
+  local compute_extra_vars
+  compute_extra_vars="tenant_target_namespace: ${OSAC_NAMESPACE}
+compute_instance_target_namespace: ${OSAC_NAMESPACE}
+tenant_storage_classes:
+  - name: standard
+    tier: default
+create_step_modify_vm_spec_override:
+  name: osac.templates.ocp_virt_vm
+  tasks_from: create_modify_vm_spec_pod_network.yaml"
+
+  local compute_templates=(
     "osac-create-compute-instance:playbook_osac_create_compute_instance.yml"
     "osac-delete-compute-instance:playbook_osac_delete_compute_instance.yml"
   )
 
-  for entry in "${templates[@]}"; do
+  for entry in "${compute_templates[@]}"; do
     local name="${entry%%:*}" playbook="${entry##*:}"
     curl -s -X POST http://localhost:8052/api/v2/job_templates/ \
       -H "Authorization: Bearer ${awx_token}" \
@@ -841,9 +905,34 @@ configure_awx() {
         \"project\": ${project_id},
         \"playbook\": \"${playbook}\",
         \"ask_variables_on_launch\": true,
-        \"extra_vars\": \"tenant_target_namespace: ${OSAC_NAMESPACE}\ncompute_instance_target_namespace: ${OSAC_NAMESPACE}\ntenant_storage_classes:\n  - name: standard\n    tier: default\"
+        \"extra_vars\": $(echo "${compute_extra_vars}" | jq -Rs .)
       }" >/dev/null
     log "  template: ${name}"
+  done
+
+  # Create no-op networking job templates (hello_world.yml — kind has no real networking backend)
+  local noop_templates=(
+    "osac-create-virtual-network"
+    "osac-delete-virtual-network"
+    "osac-create-subnet"
+    "osac-delete-subnet"
+    "osac-create-security-group"
+    "osac-delete-security-group"
+  )
+
+  for name in "${noop_templates[@]}"; do
+    curl -s -X POST http://localhost:8052/api/v2/job_templates/ \
+      -H "Authorization: Bearer ${awx_token}" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"name\": \"${name}\",
+        \"organization\": 1,
+        \"inventory\": ${inv_id},
+        \"project\": ${project_id},
+        \"playbook\": \"hello_world.yml\",
+        \"ask_variables_on_launch\": true
+      }" >/dev/null
+    log "  template: ${name} (no-op)"
   done
 
   # Create Kubernetes credential for AWX
@@ -882,9 +971,10 @@ print(f'Credential {cred_id} attached to all templates')
   kill $pf_pid 2>/dev/null
   wait $pf_pid 2>/dev/null
 
-  # Store AWX URL and token for operator config
-  AWX_TOKEN="${awx_token}"
-  AWX_URL="http://awx-service.awx.svc.cluster.local:80/api"
+  # Store AWX token as K8s secret for the operator
+  kubectl -n "${OSAC_NAMESPACE}" create secret generic awx-token \
+    --from-literal=token="${awx_token}" \
+    --dry-run=client -o yaml | kubectl apply -f -
 
   log "AWX configured for OSAC"
 }
@@ -914,6 +1004,7 @@ print_summary() {
   fi
 
   info "Access (no /etc/hosts needed):"
+  echo "  OSAC UI:          http://ui.${OSAC_NAMESPACE}.localhost:8080"
   echo "  OSAC API:         https://api.${OSAC_NAMESPACE}.localhost:${EXTERNAL_INGRESS_PORT}"
   echo "  OSAC Internal:    https://internal-api.${OSAC_NAMESPACE}.localhost:${EXTERNAL_INGRESS_PORT}"
   echo "  Keycloak Admin:   https://keycloak.${KEYCLOAK_NAMESPACE}.localhost:${EXTERNAL_INGRESS_PORT}/admin  (admin/password)"
@@ -979,6 +1070,8 @@ main() {
   install_fake_crds
   deploy_osac
   create_external_tlsroutes
+  deploy_osac_ui
+  register_hub
 
   # Step 6: Install KubeVirt + CDI + Multus
   install_multus

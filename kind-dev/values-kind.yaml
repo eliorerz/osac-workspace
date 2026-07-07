@@ -8,10 +8,13 @@ operator:
     tag: latest
     pullPolicy: Always
   aap:
-    url: ""
+    url: "http://awx-service.awx.svc.cluster.local:80/api"
     insecureSkipVerify: "true"
     statusPollInterval: "30s"
     templatePrefix: "osac"
+    tokenSecret:
+      name: awx-token
+      key: token
   fulfillment:
     serverAddress: "fulfillment-internal-api:8001"
     tokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token"
@@ -19,7 +22,7 @@ operator:
     clusterOrder: true
     computeInstance: true
     tenant: true
-    networking: false
+    networking: true
     bareMetalInstance: false
   certs:
     issuerRef:
@@ -129,6 +132,10 @@ clusterFulfillment:
 networkFulfillment:
   enabled: false
 storageFulfillment:
+  enabled: false
+
+# --- UI (disabled — uses OpenShift Route, run via pnpm dev instead) ---
+ui:
   enabled: false
 
 # --- MetalLB (disabled) ---
