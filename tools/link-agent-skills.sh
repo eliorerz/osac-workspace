@@ -94,7 +94,7 @@ link_canonical_ai_workflows() {
 verify_symlink() {
   local agent_dir="$1"
   local label="$2"
-  local expected skills_path resolved
+  local expected resolved
 
   if [[ ! -L "${agent_dir}/skills" ]]; then
     echo "ERROR: ${label}: ${agent_dir}/skills is not a symlink" >&2
