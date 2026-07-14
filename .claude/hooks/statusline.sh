@@ -24,6 +24,7 @@ repo_status() {
 
   local branch behind
   branch=$(git -C "$dir" branch --show-current 2>/dev/null) || branch="detached"
+  [[ -n "$branch" ]] || branch="detached"
   behind=$(git -C "$dir" rev-list HEAD..origin/main --count 2>/dev/null) || { log_muted "$name: $branch ?"; return; }
 
   if [[ "$behind" -eq 0 ]]; then
