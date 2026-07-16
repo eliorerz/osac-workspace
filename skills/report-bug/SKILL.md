@@ -186,17 +186,22 @@ cat >"$BODY" <<'EOF'
 _This bug was reported with AI assistance. Review for accuracy_
 EOF
 
+AFFECTS_VERSION_ARGS=()
+[ -n "${AFFECTS_VERSION:-}" ] && AFFECTS_VERSION_ARGS=(--affects-version "$AFFECTS_VERSION")
+
 jira issue create -t Bug --project OSAC \
   --summary "<concise bug title>" \
   --template "$BODY" \
-  --affects-version "<version>" \
+  "${AFFECTS_VERSION_ARGS[@]}" \
   --no-input --raw >"$OUT" 2>"$ERR" </dev/null
 
 KEY=$(jq -r '.key // empty' "$OUT")
 # On empty key or failure: cat "$ERR" >&2
 ```
 
-Omit `--affects-version` if no version was resolved.
+`AFFECTS_VERSION_ARGS` is empty when no version was resolved (user declined or
+skipped), so `--affects-version` is omitted automatically — never pass a literal
+placeholder or empty value.
 
 **Key extraction notes:**
 - Use `--raw` with stdout/stderr temps; parse with `jq -r '.key // empty' "$OUT"` — not from a command substitution around `jira issue create`.
