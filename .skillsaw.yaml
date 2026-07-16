@@ -2,7 +2,7 @@
 # https://github.com/stbenjam/skillsaw
 #
 # Lint scope: skillsaw lint . with blacklist excludes below (see Makefile,
-# .pre-commit-config.yaml rev, bootstrap.sh).
+# .github/workflows/skillsaw.yml).
 
 version: "0.16.0"
 

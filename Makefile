@@ -39,5 +39,7 @@ status: ## Show distrobox and image status
 	@echo "=== Distrobox ==="
 	@distrobox list --no-color 2>/dev/null | head -1; distrobox list --no-color 2>/dev/null | awk -F'|' 'NR>1{gsub(/^ +| +$$/,"",$$2); if($$2=="$(DISTROBOX_NAME)") print}' || echo "  (not created)"
 
-skillsaw: ## Lint repo (skillsaw version pinned in .pre-commit-config.yaml rev)
-	uvx pre-commit run skillsaw --all-files
+SKILLSAW_VERSION ?= 0.16.0
+
+skillsaw: ## Lint repo (version pinned here; must match .github/workflows/skillsaw.yml)
+	uvx --from skillsaw==$(SKILLSAW_VERSION) skillsaw lint . --strict --no-baseline

@@ -202,13 +202,6 @@ tools/link-agent-skills.sh --all
 if command -v rh-multi-pre-commit &>/dev/null; then
   echo ""
   echo "🔒 Installing rh-pre-commit hooks..."
-  if [ -f ".pre-commit-config.yaml" ]; then
-    if rh-multi-pre-commit install --path . 2>&1; then
-      echo "   ✅ osac-workspace (root)"
-    else
-      echo "   ⚠️  osac-workspace (root) (failed to install hooks)"
-    fi
-  fi
   for entry in "${REPOS[@]}"; do
     dir="${entry#*:}"
     if [ -d "$dir" ]; then
@@ -222,13 +215,6 @@ if command -v rh-multi-pre-commit &>/dev/null; then
 elif command -v pre-commit &>/dev/null; then
   echo ""
   echo "🔒 Installing pre-commit hooks..."
-  if [ -f ".pre-commit-config.yaml" ]; then
-    if pre-commit install 2>&1; then
-      echo "   ✅ osac-workspace (root)"
-    else
-      echo "   ⚠️  osac-workspace (root) (failed to install hooks)"
-    fi
-  fi
   for entry in "${REPOS[@]}"; do
     dir="${entry#*:}"
     if [ -d "$dir" ] && [ -f "$dir/.pre-commit-config.yaml" ]; then
