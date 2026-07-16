@@ -17,6 +17,8 @@ All commands use `--plain` for clean output and `--no-input` to skip interactive
 
 ## Workflow
 
+**CRITICAL:** Always present parsed action items to the user and wait for confirmation before creating tasks (Step 4).
+
 Follow this 6-step process to turn meeting notes into actionable Jira tasks:
 
 ### Step 1: Get Meeting Notes
@@ -52,7 +54,7 @@ Action: Sarah - create user stories
 Action Item: Mike - update architecture
 ```
 
-**Pattern 4: TODO with assignee**
+**Pattern 4: Action-item marker with assignee**
 ```
 TODO: Create user stories (Sarah)
 TODO: Update docs - Mike
@@ -90,9 +92,7 @@ jira project list --plain
 
 ### Step 4: Present Action Items
 
-**CRITICAL:** Always show the parsed action items to the user BEFORE creating any tasks.
-
-#### Presentation Format
+Show the parsed action items using the format below, then wait for confirmation.
 
 ```
 I found [N] action items from the meeting notes. Should I create these Jira tasks in [PROJECT] under epic [EPIC-KEY]?

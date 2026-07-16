@@ -16,6 +16,12 @@ Manage issues on Red Hat Jira (`redhat.atlassian.net`) via `jira-cli`. The tool 
 - **Default project:** OSAC
 - **Jira URL pattern:** `https://redhat.atlassian.net/browse/<KEY>`
 
+## CLI rules
+
+- **`--comments` requires a count** — e.g. `jira issue view OSAC-123 --plain --comments 10`. Omitting the number errors with "flag needs an argument".
+- **`jira-cli` prepends `project="OSAC"` to `-q`/`--jql` queries** — prefer `-q` in examples (`--jql` is equivalent). Within OSAC, use either normally (project is auto-prepended). For cross-project search, start with `project IS NOT EMPTY AND ...`. For another project, start with `project = OTHERKEY AND ...`. Never put `ORDER BY` in the query (jira-cli appends its own).
+- **Prefer filter flags** (`-r`, `-t`, `-a`, `-s`) over embedding the same filters in JQL when possible — jira-cli appends them cleanly.
+
 ## Before Creating Issues
 
 When the user asks to create a Task or Bug:
@@ -48,8 +54,10 @@ jira issue create -tTask -s "Summary" \
 KEY=$(jq -r '.key' /tmp/jira-create.out)
 ```
 
-**Never do this:**
+**Use the safe create pattern above for every issue create.** Do not use command substitution or kill a create mid-flight:
+
 - `KEY=$(jira issue create ... --body "$(cat <<'EOF' ... EOF)" 2>/dev/null | jq -r '.key')` — no stdout until done; stderr hidden; looks hung for minutes
+- `KEY=$(jira issue create ...)` — same problem when create is wrapped in command substitution
 - Kill a running create and immediately retry
 - Retry based only on a search that ran seconds earlier (Jira index lag)
 
@@ -69,20 +77,12 @@ KEY=$(jq -r '.key' /tmp/jira-create.out)
 
 ```bash
 jira issue view <KEY> --plain                    # View issue details
-jira issue view <KEY> --plain --comments 100     # Include comments (count is REQUIRED)
+jira issue view <KEY> --plain --comments 100     # Include comments (count required — see CLI rules)
 ```
-
-**IMPORTANT:** `--comments` requires a numeric argument (e.g., `--comments 10`). Using `--comments` alone without a number will error with "flag needs an argument". Always specify a count.
 
 ### Search
 
-**IMPORTANT: `jira-cli` always prepends `project="OSAC"` to `-q`/`--jql` queries.** Use `-q` (not `--jql`) for all searches, and follow these rules:
-
-- **Within OSAC project:** Use `-q` normally — the project is auto-prepended.
-- **Across all projects:** Start the query with `project IS NOT EMPTY AND ...` — jira-cli detects the existing `project` clause and skips prepending.
-- **Specific other project:** Start with `project = OTHERKEY AND ...`.
-- **Never include `ORDER BY`** in `-q` queries — jira-cli appends its own `ORDER BY created DESC`, causing a JQL syntax error from duplicate ORDER BY clauses.
-- **Use filter flags** (`-r`, `-t`, `-a`, `-s`) instead of embedding them in JQL when possible — they're appended cleanly.
+`jira-cli` search behavior is documented in **CLI rules** above. Examples:
 
 ```bash
 # Within OSAC (project auto-prepended)

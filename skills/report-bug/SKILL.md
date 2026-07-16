@@ -38,7 +38,7 @@ Before creating the ticket, verify you can answer these with user-facing informa
 2. What does the user see that is wrong?
 3. What should the user see instead?
 
-If you don't have enough information to answer these, ask the user: "I need more detail to file this bug properly. Can you describe the problem from a user's perspective — what you did, what you expected, and what went wrong?"
+If you don't have enough information to answer these, ask the user: "I need more detail to file this bug with user-facing summary, repro steps, and expected vs actual behavior. Can you describe what you did, what you expected, and what went wrong?"
 
 Do not create the ticket until you can fill the template.
 
@@ -47,7 +47,7 @@ Do not create the ticket until you can fill the template.
 Once the epic is known, detect the version before confirming inputs with the user:
 
 1. If the user already specified a version, use it
-2. If an epic is known, try to detect from its `fixVersions`:
+2. If an epic is known, read `fixVersions` from the epic:
    ```bash
    jira issue view <EPIC> --raw 2>/dev/null | jq -r '.fields.fixVersions[0].name // empty'
    ```
@@ -58,23 +58,22 @@ Once the epic is known, detect the version before confirming inputs with the use
 
 ## Formatting Rules
 
-`jira-cli` converts the body to Atlassian Document Format (ADF). Use **Markdown only** -- Jira wiki markup renders incorrectly.
+`jira-cli` converts the body to Atlassian Document Format (ADF). Use **Markdown only** — Jira wiki markup (`*bold*`, `{{code}}`, `{code}`, `[text|url]`) renders incorrectly.
 
-**Use:**
 - `**bold**` for section headers
 - `` `code` `` for inline code
 - `- item` for bullet lists
 - `[text](url)` for links
 - ` ```lang ` fenced blocks for code snippets
 
-Do not use Jira wiki markup (`*bold*`, `{{code}}`, `{code}`, `[text|url]`).
-
 ## Create the Bug
 
+Use the safe create pattern from `jira-task-management` — write the body to a template file, run create directly (not inside `$(...)`), then parse the key from the output file:
+
 ```bash
-KEY=$(jira issue create -t Bug --project OSAC \
-  --summary "<concise bug title>" \
-  --body "**Description of the problem:**
+# 1. Write body to a temp file (see jira-task-management for why)
+cat > /tmp/bug-body.md <<'EOF'
+**Description of the problem:**
 
 <describe the problem>
 
@@ -96,16 +95,25 @@ KEY=$(jira issue create -t Bug --project OSAC \
 
 ---
 
-_This bug was reported with AI assistance. Review for accuracy_" \
+_This bug was reported with AI assistance. Review for accuracy_
+EOF
+
+# 2. Create directly; allow up to 3 minutes — do not kill and retry
+jira issue create -t Bug --project OSAC \
+  --summary "<concise bug title>" \
+  --template /tmp/bug-body.md \
   --label OSAC \
   --affects-version "<version>" \
-  --no-input --raw | jq -r '.key')
+  --no-input --raw > /tmp/jira-create.out
+
+# 3. Parse key from output file
+KEY=$(jq -r '.key' /tmp/jira-create.out)
 ```
 
 Omit `--affects-version` if no version was resolved.
 
 **Key extraction notes:**
-- Use `--raw` to get JSON output on stdout, then `jq -r '.key'` to extract the issue key reliably.
+- Use `--raw` and parse with `jq -r '.key'` from the output file — not from a command substitution around `jira issue create`.
 - Do **not** use `grep -oP` on the text output — it can match multiple keys in the URL or fail silently.
 
 ### Link to epic

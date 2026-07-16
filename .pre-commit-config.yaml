@@ -1,0 +1,15 @@
+# skillsaw rev pins the linter version for all contributors.
+# Lint scope: blacklist in .skillsaw.yaml exclude (skillsaw lint .).
+# Install: pre-commit install  (bootstrap.sh does this when pre-commit is available)
+repos:
+  - repo: https://github.com/stbenjam/skillsaw
+    rev: v0.16.0
+    hooks:
+      - id: skillsaw
+        verbose: true
+        pass_filenames: false
+        # Run only when skills or root agent docs change (~4s); skip unrelated
+        # commits. args: . lints the full tree so AGENTS.md/CLAUDE.md/.claude/
+        # stay validated even when only a skill file is staged.
+        files: ^(skills/|AGENTS\.md|CLAUDE\.md|\.claude/)
+        args: [--strict, --no-baseline, .]

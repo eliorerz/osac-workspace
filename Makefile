@@ -4,7 +4,7 @@ HOME_DIR ?= $(HOME)
 CONTAINER_CMD ?= $(shell command -v podman 2>/dev/null || echo docker)
 ARGS ?=
 
-.PHONY: image enter claude stop rm rebuild status help
+.PHONY: image enter claude stop rm rebuild status help skillsaw
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -38,3 +38,6 @@ status: ## Show distrobox and image status
 	@echo ""
 	@echo "=== Distrobox ==="
 	@distrobox list --no-color 2>/dev/null | head -1; distrobox list --no-color 2>/dev/null | awk -F'|' 'NR>1{gsub(/^ +| +$$/,"",$$2); if($$2=="$(DISTROBOX_NAME)") print}' || echo "  (not created)"
+
+skillsaw: ## Lint repo (skillsaw version pinned in .pre-commit-config.yaml rev)
+	uvx pre-commit run skillsaw --all-files
