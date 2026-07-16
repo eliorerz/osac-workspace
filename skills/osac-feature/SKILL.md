@@ -683,7 +683,7 @@ Features should include these sections (in `$BODY`):
 - Gate tasks track documentation milestones, not implementation work
 - **Fix version:** Feature chooses at confirm gate; bootstrap epic copies when set;
   gate tasks never receive `fixVersion`
-- **Backfill existing epics:** `tools/backfill-bootstrap-epics.sh --dry-run` (review),
-  then `--apply` after explicit approval
+- Existing bootstrap epics predating this convention are not backfilled — only
+  epics created going forward get the `bootstrap` label and copied `fixVersion`
 - Temp files: source `tools/jira-safe-create.sh`; call `add_temp` in the parent shell after each `new_temp` — see `jira-task-management` Safe create pattern
 - jira-cli handles markdown-to-ADF conversion automatically
