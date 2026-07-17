@@ -129,6 +129,23 @@ What UI support does the feature require in the osac-ui web console (bootstrappe
 - Does the feature require new UI components or extend existing ones in osac-ui?
 - Which Fulfillment API resources and catalog entries need console representation? (osac-ui uses the Fulfillment Public API via proxy — not direct CRD access)
 
+#### Jira component conventions
+
+When a feature requires UI work, add UI tasks to the feature's regular epics
+(not a separate UI epic). Each UI task for an affected persona gets an extra
+component so it appears in the right Jira filter:
+
+| Persona | Components |
+|---------|------------|
+| Cloud Infrastructure Admin | Epic's components + `Enclave` |
+| Cloud Provider Admin | Epic's components + `UI` |
+| Tenant Admin | Epic's components + `UI` |
+| Tenant User | Epic's components + `UI` |
+
+Only create UI tasks for personas affected by the feature. The per-component
+Jira filters track UI work across services (CaaS, BMaaS, VMaaS, Core,
+Enclave, Connectivity&Fabric, Storage) using these component assignments.
+
 ## User-Facing Behavior
 
 For each service in scope, identify which user-observable behaviors the feature
